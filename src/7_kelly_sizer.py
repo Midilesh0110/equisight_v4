@@ -32,7 +32,7 @@ def execute_sizing():
     
     if not os.path.exists(decisions_file) or not os.path.exists(cones_file):
         print("⚠️ [SIZER] Missing agent decisions or risk parameters. Standing down.")
-        sys.exit(1)
+        sys.exit(0)
         
     decisions_df = pd.read_csv(decisions_file).set_index('Ticker')
     cones_df = pd.read_csv(cones_file).set_index('Ticker')
