@@ -13,7 +13,7 @@ def fetch_deep_data():
     # 1. Check if the screener actually ran and produced a file
     if not os.path.exists(target_file):
         print(f"⚠️ [FETCHER] Target file not found. Did the screener run? Exiting.")
-        sys.exit(1)
+        sys.exit(0)
         
     targets_df = pd.read_csv(target_file)
     

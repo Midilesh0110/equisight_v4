@@ -30,7 +30,7 @@ def generate_probability_cones():
     
     if not os.path.exists(target_file):
         print("⚠️ [BOUNCER] No active targets file found. Standing down.")
-        sys.exit(1)
+        sys.exit(0)
         
     targets_df = pd.read_csv(target_file)
     if targets_df.empty:

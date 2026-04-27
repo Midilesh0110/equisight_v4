@@ -55,7 +55,7 @@ def execute_q_inference():
     
     if not os.path.exists(cones_file) or not os.path.exists(regime_file):
         print("⚠️ [Q-AGENT] Missing state data (Cones or Regime). Standing down.")
-        sys.exit(1)
+        sys.exit(0)
         
     cones_df = pd.read_csv(cones_file).set_index('Ticker')
     regime_df = pd.read_csv(regime_file).set_index('Ticker')
