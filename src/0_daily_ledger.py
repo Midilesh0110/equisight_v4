@@ -7,26 +7,26 @@ from datetime import datetime
 def generate_daily_ledger():
     print("📊 [LEDGER] Generating daily evaluation bounds for the universe...")
     
-    # Load universe and apply strict exclusions
     universe_path = 'config/nifty_universe.txt'
     if not os.path.exists(universe_path):
         print("⚠️ [LEDGER] Universe file missing.")
         return
 
     with open(universe_path, 'r') as f:
-        # Exclude HDFC stocks from the scan per system rules
+        # Strict exclusion of HDFC stocks remains active
         tickers = [line.strip() for line in f if line.strip() and 'HDFC' not in line.upper()]
 
     ledger_data = []
+    now = datetime.now()
+    current_date = now.strftime('%Y-%m-%d')
+    current_time = now.strftime('%H:%M:%S')
 
     for ticker in tickers:
         try:
-            # Fetch last 20 days to calculate baseline ATR
             data = yf.download(ticker, period="1mo", progress=False)
             if data.empty or len(data) < 20:
                 continue
             
-            # Basic ATR calculation for the cones
             data['High-Low'] = data['High'] - data['Low']
             data['High-PrevClose'] = abs(data['High'] - data['Close'].shift(1))
             data['Low-PrevClose'] = abs(data['Low'] - data['Close'].shift(1))
@@ -35,29 +35,35 @@ def generate_daily_ledger():
             
             current_price = data['Close'].iloc[-1]
             
-            # Calculate P10, P50, P90
             p50 = current_price
-            p90 = current_price + (atr * 1.5)  # 90th Percentile Bull
-            p10 = current_price - (atr * 1.5)  # 10th Percentile Bear
+            p90 = current_price + (atr * 1.5)
+            p10 = current_price - (atr * 1.5)
             
             ledger_data.append({
-                "Date": datetime.now().strftime('%Y-%m-%d'),
+                "Date": current_date,
+                "Time": current_time,
                 "Ticker": ticker,
-                "Current_Price": round(float(current_price), 2),
-                "P10_Bear": round(float(p10), 2),
-                "P50_Base": round(float(p50), 2),
-                "P90_Bull": round(float(p90), 2),
-                "Action": "LOGGED" # Baseline log; the actual agent will overwrite this if traded
+                "Current Price": round(float(current_price), 2),
+                "Master Signal": "LOGGED",
+                "P10 Target": round(float(p10), 2),
+                "P50 Target": round(float(p50), 2),
+                "P90 Target": round(float(p90), 2),
+                "Reason": "Baseline bounds recorded."
             })
         except Exception as e:
             continue
 
     if ledger_data:
         df = pd.DataFrame(ledger_data)
-        os.makedirs('data/ledger', exist_ok=True)
-        filename = f"data/ledger/v4_evaluation_{datetime.now().strftime('%Y%m%d')}.csv"
-        df.to_csv(filename, index=False)
-        print(f"✅ [LEDGER] Successfully saved {len(ledger_data)} stocks to {filename}")
+        ledger_file = "equisight_v4_ledger.csv"
+        
+        # Append if the file exists, create a new one with headers if it doesn't
+        if os.path.exists(ledger_file):
+            df.to_csv(ledger_file, mode='a', header=False, index=False)
+        else:
+            df.to_csv(ledger_file, index=False)
+            
+        print(f"✅ [LEDGER] Successfully appended {len(ledger_data)} records to {ledger_file}")
 
 if __name__ == "__main__":
     generate_daily_ledger()

@@ -2,13 +2,16 @@ name: EquiSight V4 Daily Execution
 
 on:
   schedule:
-    # Runs at 03:15 UTC (8:45 AM IST) every weekday (Mon-Fri)
     - cron: '15 3 * * 1-5'
-  workflow_dispatch: # This adds a "Run Now" button on GitHub
+  workflow_dispatch:
 
 jobs:
   execute-quant-pipeline:
     runs-on: ubuntu-latest
+    
+    # Give the bot permission to push the CSV back to the repo
+    permissions:
+      contents: write 
 
     steps:
       - name: 📥 Checkout Repository
@@ -27,10 +30,11 @@ jobs:
       - name: 🚀 Execute Master Orchestrator
         run: python run_pipeline.py
 
-      - name: 💾 Upload Daily Directives as Artifacts
-        if: always() 
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-orders
-          path: data/
-          overwrite: true
+      - name: 🤖 Auto-Commit Master Ledger
+        if: always()
+        run: |
+          git config --global user.name "EquiSight-Bot"
+          git config --global user.email "bot@equisight.local"
+          git add equisight_v4_ledger.csv
+          git commit -m "Auto-update V4 Ledger: $(date -u)" || echo "No changes to commit"
+          git push origin main
