@@ -18,6 +18,7 @@ def execute_full_pipeline():
     
     # The exact chronological order of inference
     pipeline = [
+        "src/0_daily_ledger.py",  # <--- NEW: Runs first to guarantee daily P10/P50/P90 logging
         "src/1_nse_screener.py",
         "src/2_data_fetcher.py",
         "src/3_dynamic_bouncer.py",

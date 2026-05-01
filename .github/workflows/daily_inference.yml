@@ -32,3 +32,10 @@ jobs:
         with:
           name: daily-orders
           path: data/active_targets/
+      - name: 💾 Upload Daily Directives as Artifacts
+        # Ensure this runs even if previous steps (like the screener) exited with code 0
+        if: always() 
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-orders
+          path: data/  # <--- Changed this to upload the whole data folder
