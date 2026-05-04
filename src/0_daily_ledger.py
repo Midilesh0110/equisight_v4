@@ -13,7 +13,6 @@ def generate_daily_ledger():
         return
 
     with open(universe_path, 'r') as f:
-        # Strict exclusion of HDFC stocks remains active
         tickers = [line.strip() for line in f if line.strip() and 'HDFC' not in line.upper()]
 
     ledger_data = []
@@ -23,8 +22,12 @@ def generate_daily_ledger():
 
     for ticker in tickers:
         try:
-            data = yf.download(ticker, period="1mo", progress=False)
-            if data.empty or len(data) < 20:
+            # FIX 1: Fetch 2 months to guarantee we bypass holiday shortages
+            data = yf.download(ticker, period="2mo", progress=False)
+            
+            # FIX 2: We only need 14 days for our ATR, so 15 is a safer floor
+            if data.empty or len(data) < 15:
+                print(f"⚠️ [LEDGER] Insufficient data for {ticker}. Days fetched: {len(data)}")
                 continue
             
             data['High-Low'] = data['High'] - data['Low']
@@ -51,19 +54,22 @@ def generate_daily_ledger():
                 "Reason": "Baseline bounds recorded."
             })
         except Exception as e:
+            # FIX 3: Un-silence the errors so we can catch IP blocks
+            print(f"❌ [LEDGER] Error processing {ticker}: {e}")
             continue
 
     if ledger_data:
         df = pd.DataFrame(ledger_data)
         ledger_file = "equisight_v4_ledger.csv"
         
-        # Append if the file exists, create a new one with headers if it doesn't
         if os.path.exists(ledger_file):
             df.to_csv(ledger_file, mode='a', header=False, index=False)
         else:
             df.to_csv(ledger_file, index=False)
             
         print(f"✅ [LEDGER] Successfully appended {len(ledger_data)} records to {ledger_file}")
+    else:
+        print("❌ [LEDGER] CRITICAL: No data was generated for any ticker.")
 
 if __name__ == "__main__":
     generate_daily_ledger()
