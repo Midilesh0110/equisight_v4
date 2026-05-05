@@ -11,7 +11,8 @@ def validate_ohlcv_integrity(data, ticker):
             raise AssertionError("Null values detected in OHLCV array.")
             
         # 2. No Circuit Locks (Zero Volume)
-        if (data['Volume'] <= 0).any():
+        # .any(axis=None) forces pandas to check the entire 2D structure and return a single True/False
+        if (data['Volume'] <= 0).any(axis=None):
             raise AssertionError("Zero-volume bars detected (Possible circuit lock).")
             
         # 3. Meaningful Volatility

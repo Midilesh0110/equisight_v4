@@ -46,11 +46,12 @@ def generate_daily_ledger():
                 "Date": current_date,
                 "Time": current_time,
                 "Ticker": ticker,
-                "Current Price": round(float(current_price), 2),
-                "Master Signal": "LOGGED",
-                "P10 Target": round(float(p10), 2),
-                "P50 Target": round(float(p50), 2),
-                "P90 Target": round(float(p90), 2),
+               # Use .iloc[0] to ensure we are grabbing the scalar value before converting to float
+                "Current Price": round(float(current_price.iloc[0]), 2),
+                "Master Siganl": "LOGGED",
+                "P10 Target": round(float(p10.iloc[0]), 2),
+                "P50 Target": round(float(p50.iloc[0]), 2),
+                "P90 Target": round(float(p90.iloc[0]), 2),
                 "Reason": "Baseline bounds recorded."
             })
         except Exception as e:
