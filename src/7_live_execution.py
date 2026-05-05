@@ -144,10 +144,65 @@ def run_live_inference():
             'Capital_Req': capital_allocated
         })
 
-    # Filter out HOLDS, sort, and STRICTLY CAP AT TOP 5 TRADES (Max 100% Capital)
+    # Filter out the HOLDS
     final_orders_df = pd.DataFrame(todays_orders)
-    actionable_trades = final_orders_df[final_orders_df['Action'] != 'HOLD'].sort_values(by='Capital_Req', ascending=False).head(5)
+    raw_actionable = final_orders_df[final_orders_df['Action'] != 'HOLD'].sort_values(by='Capital_Req', ascending=False)
     
+    actionable_trades = raw_actionable
+    
+    # 🛡️ THE CORRELATION SHIELD (Diversification Enforcer)
+    if len(raw_actionable) > 1:
+        print("\n🔍 [RISK SHIELD] Running Sector Correlation Matrix...")
+        
+        # Download the last 60 days of history for our active signals
+        actionable_tickers = raw_actionable['Ticker'].tolist()
+        corr_data = yf.download(actionable_tickers, period="60d", progress=False)['Close']
+        
+        # Flatten yfinance multi-index
+        if isinstance(corr_data.columns, pd.MultiIndex):
+            corr_data.columns = corr_data.columns.get_level_values(0)
+            
+        # Calculate the mathematical correlation between the stocks
+        returns_df = np.log(corr_data / corr_data.shift(1)).dropna()
+        corr_matrix = returns_df.corr()
+        
+        filtered_trades = []
+        accepted_tickers = []
+        
+        for index, row in raw_actionable.iterrows():
+            ticker = row['Ticker']
+            
+            # The #1 highest conviction trade is always accepted
+            if not accepted_tickers:
+                accepted_tickers.append(ticker)
+                filtered_trades.append(row)
+                continue
+                
+            # Check correlation against already accepted trades
+            is_correlated = False
+            for accepted in accepted_tickers:
+                if ticker in corr_matrix.columns and accepted in corr_matrix.columns:
+                    correlation = corr_matrix.loc[ticker, accepted]
+                    
+                    # If they move together more than 70% of the time, reject the weaker one
+                    if correlation > 0.70:
+                        print(f"   ⚠️ Rejecting {ticker}: Too correlated ({correlation:.2f}) with {accepted}")
+                        is_correlated = True
+                        break
+                        
+            if not is_correlated:
+                accepted_tickers.append(ticker)
+                filtered_trades.append(row)
+                
+            # Stop once we hit our 5-trade limit (100% Capital Deployed)
+            if len(filtered_trades) >= 5:
+                break
+                
+        actionable_trades = pd.DataFrame(filtered_trades)
+    else:
+        # If there's only 0 or 1 trade, just take it
+        actionable_trades = raw_actionable.head(5)
+
     # Save the execution list
     os.makedirs('data', exist_ok=True)
     today_str = datetime.now().strftime('%Y-%m-%d')

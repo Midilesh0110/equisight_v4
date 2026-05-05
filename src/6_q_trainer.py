@@ -171,8 +171,14 @@ def train_agent():
                     if q_table.loc[current_state].max() == 0: action = 'HOLD'
 
                 price_change = tomorrow['Close'] - today['Close']
-                reward = 1 if (action == 'BUY' and price_change > 0) or (action == 'SELL' and price_change < 0) else -1 if action in ['BUY', 'SELL'] else 0
-
+                reward = 0
+            
+                if action == 'BUY':
+                    reward = 1 if price_change > 0 else -1
+                elif action == 'SELL':
+                    reward = 1 if price_change < 0 else -1
+                elif action == 'HOLD':
+                    reward = 0 # THE FIX: Restoring the Sniper mentality. No penalty for patience.
                 next_price, next_atr = tomorrow['Close'], tomorrow['ATR']
                 next_location = get_price_location(next_price, next_price - next_atr, next_price, next_price + next_atr)
                 next_state = f"{tomorrow['Regime']}_{next_location}"
