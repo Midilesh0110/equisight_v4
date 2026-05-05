@@ -1,52 +1,73 @@
 import pandas as pd
 import yfinance as yf
+import numpy as np
 import os
-import sys
-from datetime import datetime
 
-def fetch_deep_data():
-    """Reads the active targets and downloads multi-timeframe data for them."""
-    
-    today_str = datetime.now().strftime('%Y%m%d')
-    target_file = os.path.join('data', 'active_targets', f'top_5_alpha_{today_str}.csv')
-    
-    # 1. Check if the screener actually ran and produced a file
-    if not os.path.exists(target_file):
-        print(f"⚠️ [FETCHER] Target file not found. Did the screener run? Exiting.")
-        sys.exit(0)
+def validate_ohlcv_integrity(data, ticker):
+    """Executes critical data sanity checks. Fails bad data immediately."""
+    try:
+        # 1. No Nulls
+        if data.isnull().values.any():
+            raise AssertionError("Null values detected in OHLCV array.")
+            
+        # 2. No Circuit Locks (Zero Volume)
+        if (data['Volume'] <= 0).any():
+            raise AssertionError("Zero-volume bars detected (Possible circuit lock).")
+            
+        # 3. Meaningful Volatility
+        data['High-Low'] = data['High'] - data['Low']
+        data['High-PrevClose'] = abs(data['High'] - data['Close'].shift(1))
+        data['Low-PrevClose'] = abs(data['Low'] - data['Close'].shift(1))
+        data['TR'] = data[['High-Low', 'High-PrevClose', 'Low-PrevClose']].max(axis=1)
         
-    targets_df = pd.read_csv(target_file)
+        atr_series = data['TR'].rolling(window=14).mean().dropna()
+        if atr_series.empty:
+            raise AssertionError("Insufficient data for ATR calculation.")
+            
+        current_atr = atr_series.iloc[-1]
+        if current_atr <= 0.001:
+            raise AssertionError(f"ATR is practically zero ({current_atr}). Division by zero risk.")
+            
+        # 4. No Extreme Black Swan Outliers
+        log_atr = np.log(atr_series[atr_series > 0]) 
+        if np.std(log_atr) >= 3:
+            raise AssertionError(f"Extreme volatility outlier detected.")
+
+        return True 
+
+    except AssertionError as e:
+        print(f"⚠️ [DATA SHIELD] {ticker} dropped: {e}")
+        return False
+
+def fetch_active_market_data():
+    print("📡 [FETCHER] Initiating robust data ingestion...")
     
-    # 2. Check if the bouncer rejected everything
-    if targets_df.empty:
-        print("⚠️ [FETCHER] No active targets today. Standing down to preserve capital.")
-        sys.exit(0)
-        
-    tickers = targets_df['Ticker'].tolist()
-    print(f"📥 [FETCHER] Waking up. Pulling deep multi-timeframe data for: {tickers}")
-    
-    # Ensure our data directory exists
-    os.makedirs(os.path.join('data', 'mtf_data'), exist_ok=True)
-    
-    # 3. Download the high-resolution data
+    # Read universe, strictly bypassing HDFC
+    universe_path = 'config/nifty_universe.txt'
+    with open(universe_path, 'r') as f:
+        tickers = [line.strip() for line in f if line.strip() and 'HDFC' not in line.upper()]
+
+    valid_data = {}
     for ticker in tickers:
-        print(f"   -> Fetching {ticker} (15-min Intraday & Daily)...")
-        try:
-            # Fetching 15m data for the last 60 days (max allowed by Yahoo for 15m)
-            intraday = yf.download(ticker, period="60d", interval="15m", progress=False)
-            # Fetching 1d data for the last 2 years for macro context
-            daily = yf.download(ticker, period="2y", interval="1d", progress=False)
+        # Fetching 2 months to prevent holiday gaps from breaking the 14-day ATR
+        data = yf.download(ticker, period="2mo", progress=False)
+        
+        if data.empty or len(data) < 15:
+            print(f"⚠️ [FETCHER] {ticker} dropped: Insufficient trading days.")
+            continue
             
-            # Save them to the local data lake
-            intraday_path = os.path.join('data', 'mtf_data', f'{ticker}_15m.csv')
-            daily_path = os.path.join('data', 'mtf_data', f'{ticker}_1d.csv')
-            
-            intraday.to_csv(intraday_path)
-            daily.to_csv(daily_path)
-        except Exception as e:
-            print(f"   ❌ Failed to fetch data for {ticker}: {e}")
-            
-    print("✅ [FETCHER] High-resolution data secured. Ready for the Deep Inference engine.")
+        if validate_ohlcv_integrity(data, ticker):
+            valid_data[ticker] = data
+            print(f"✅ [FETCHER] {ticker} passed all integrity checks.")
+
+    # Save validated data for Phase 3
+    if not os.path.exists('data/active_targets'):
+        os.makedirs('data/active_targets')
+        
+    for ticker, df in valid_data.items():
+        df.to_csv(f"data/active_targets/{ticker}_clean.csv")
+        
+    print(f"🏁 [FETCHER] Pipeline secured. {len(valid_data)} targets ready for AI processing.")
 
 if __name__ == "__main__":
-    fetch_deep_data()
+    fetch_active_market_data()
