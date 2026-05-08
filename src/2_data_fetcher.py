@@ -12,8 +12,11 @@ def validate_ohlcv_integrity(data, ticker):
             
         # 2. No Circuit Locks (Zero Volume)
         # .any(axis=None) forces pandas to check the entire 2D structure and return a single True/False
-        if (data['Volume'] <= 0).any(axis=None):
-            raise AssertionError("Zero-volume bars detected (Possible circuit lock).")
+                # 2. No Suspended/Delisted Stocks
+        # Relaxed for yfinance NSE glitches: Only drop if the ENTIRE dataset has zero volume.
+        if (data['Volume'] <= 0).all(axis=None):
+            raise AssertionError("Zero total volume (Suspended/Delisted).")
+
             
         # 3. Meaningful Volatility
         data['High-Low'] = data['High'] - data['Low']
