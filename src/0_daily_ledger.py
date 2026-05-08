@@ -50,8 +50,8 @@ def generate_daily_ledger():
     # ==========================================
     # 1. LOAD YOUR V4 AI MODELS
     # ==========================================
-    hmm_path = 'equisight_hmm_v4.pkl'
-    q_table_path = 'equisight_q_table_v4.npy'
+    hmm_path = 'models/equisight_hmm_v4.pkl'
+    q_table_path = 'models/equisight_q_table_v4.npy'
 
     if not os.path.exists(hmm_path) or not os.path.exists(q_table_path):
         print(f"❌ [LEDGER] CRITICAL: Models missing! Ensure {hmm_path} and {q_table_path} are in this directory.")
