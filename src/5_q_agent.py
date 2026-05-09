@@ -57,7 +57,17 @@ def execute_q_inference():
         print("⚠️ [Q-AGENT] Missing state data (Cones or Regime). Standing down.")
         sys.exit(0)
         
-    cones_df = pd.read_csv(cones_file).set_index('Ticker')
+        # Safely load the dynamic cones
+    try:
+        cones_df = pd.read_csv(cones_file)
+        if cones_df.empty:
+            print("🛡️ [Q-AGENT] Bouncer file is empty. No targets passed. Standing down.")
+            return
+        cones_df = cones_df.set_index('Ticker')
+    except pd.errors.EmptyDataError:
+        print("🛡️ [Q-AGENT] Bouncer file is empty. No targets passed. Standing down.")
+        return
+
     regime_df = pd.read_csv(regime_file).set_index('Ticker')
     
     q_table = load_or_create_q_table()
