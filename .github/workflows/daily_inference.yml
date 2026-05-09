@@ -1,9 +1,11 @@
 name: EquiSight V4 Daily Execution
 
 on:
-  workflow_dispatch: # Keeps manual button
-  repository_dispatch:
-    types: [daily_execution_trigger] # The secret password the external service will send
+  workflow_dispatch: 
+  schedule:
+    # 15 3 = 3:15 AM UTC (Exactly 8:45 AM IST)
+    # 1-5 = Strictly Monday through Friday
+    - cron: '15 3 * * 1-5'
 
 jobs:
   execute-quant-pipeline:
